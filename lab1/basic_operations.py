@@ -1,13 +1,14 @@
 from typing import List, Tuple
+from consts import NUMB_OF_BITS
 
 def decimal_to_binary(x: int) -> List[int]:
     """Переводит десятичное число в 32-битный массив (прямой код: знак + модуль)."""
-    arr = [0] * 32
+    arr = [0] * NUMB_OF_BITS
     if x < 0:
         arr[0] = 1
 
     x = abs(x)
-    i = 31
+    i = NUMB_OF_BITS - 1
 
     while x != 0 and i > 0:
         arr[i] = x % 2
@@ -38,7 +39,7 @@ def decimal_to_ones_complement(x: int) -> List[int]:
     """Переводит в обратный код (для отрицательных инвертируем все биты модуля)."""
     arr = decimal_to_binary(x)
     if arr[0] == 1:
-        for i in range(1, 32):
+        for i in range(1, NUMB_OF_BITS):
             arr[i] = 1 - arr[i]
     return arr
 
@@ -48,10 +49,10 @@ def twos_complement(arr: List[int]) -> List[int]:
         return arr.copy()
 
     res = arr.copy()
-    for i in range(1, 32):
+    for i in range(1, NUMB_OF_BITS):
         res[i] = 1 - res[i]
 
-    for i in range(31, 0, -1):
+    for i in range(NUMB_OF_BITS-1, 0, -1):
         res[i] += 1
         if res[i] == 2:
             res[i] = 0
@@ -66,10 +67,10 @@ def add_binary(x1: int, x2: int) -> List[int]:
     bin1 = twos_complement(decimal_to_binary(x1))
     bin2 = twos_complement(decimal_to_binary(x2))
 
-    ans = [0] * 32
+    ans = [0] * NUMB_OF_BITS
     carry = 0
 
-    for bit in range(31, -1, -1):
+    for bit in range(NUMB_OF_BITS-1, -1, -1):
         total = bin1[bit] + bin2[bit] + carry
         ans[bit] = total % 2
         carry = total // 2
@@ -83,22 +84,22 @@ def minus_binary(x1: int, x2: int) -> List[int]:
 def multiply(x1: int, x2: int) -> List[int]:
     """Умножает два числа в бинарном виде (прямой код)."""
     if x1 == 0 or x2 == 0:
-        return [0] * 32
+        return [0] * NUMB_OF_BITS
 
     bin1 = decimal_to_binary(x1)
     bin2 = decimal_to_binary(x2)
 
-    ans = [0] * 32
+    ans = [0] * NUMB_OF_BITS
     ans[0] = bin1[0] ^ bin2[0]
 
     for i in range(31, 0, -1):
         if bin2[i] == 1:
-            diff = 31 - i
-            for j in range(31, 0, -1):
+            diff = NUMB_OF_BITS - 1 - i
+            for j in range(NUMB_OF_BITS - 1, 0, -1):
                 if j - diff > 0:
                     ans[j - diff] += bin1[j]
 
-    for i in range(31, 0, -1):
+    for i in range(NUMB_OF_BITS - 1, 0, -1):
         carry = ans[i] // 2
         ans[i] %= 2
         if i > 1:

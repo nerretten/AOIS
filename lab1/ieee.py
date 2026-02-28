@@ -1,10 +1,12 @@
 from basic_operations import unsigned_to_decimal, clean_zeros, is_greater_or_equal, subtract_binary
 from typing import List
+from consts import NUMB_OF_BITS, LEN_OF_MANTISS, EXP_CONST, END_OF_EXP
+
 
 def float_to_ieee_bin(f: float) -> List[int]:
     """Ручной перевод десятичной дроби в 32-битный массив IEEE-754."""
     if f == 0.0:
-        return [0] * 32
+        return [0] * NUMB_OF_BITS
 
     sign = 1 if f < 0 else 0
     f = abs(f)
@@ -32,36 +34,36 @@ def float_to_ieee_bin(f: float) -> List[int]:
         try:
             first_one = frac_bits.index(1)
         except ValueError:
-            return [sign] + [0] * 31
+            return [sign] + [0] * (NUMB_OF_BITS-1)
         exp = -(first_one + 1)
         mantissa = frac_bits[first_one + 1:]
 
-    exp_biased = exp + 127
+    exp_biased = exp + EXP_CONST
     exp_bits = []
     for _ in range(8):
         exp_bits.insert(0, exp_biased % 2)
         exp_biased //= 2
 
-    mantissa = mantissa[:23]
-    while len(mantissa) < 23:
+    mantissa = mantissa[:LEN_OF_MANTISS]
+    while len(mantissa) < LEN_OF_MANTISS:
         mantissa.append(0)
 
     return [sign] + exp_bits + mantissa
 
 def ieee_bin_to_float(bits: List[int]) -> float:
     """Ручной перевод 32-битного массива IEEE-754 обратно в float."""
-    if all(b == 0 for b in bits[1:32]):
+    if all(b == 0 for b in bits[1:]):
         return 0.0
 
     sign = -1 if bits[0] == 1 else 1
-    exp_val = unsigned_to_decimal(bits[1:9])
+    exp_val = unsigned_to_decimal(bits[1:END_OF_EXP])
 
     mantissa_val = 1.0
-    for i, b in enumerate(bits[9:32]):
+    for i, b in enumerate(bits[END_OF_EXP:NUMB_OF_BITS]):
         if b == 1:
             mantissa_val += 2 ** -(i + 1)
 
-    return sign * mantissa_val * (2 ** (exp_val - 127))
+    return sign * mantissa_val * (2 ** (exp_val - EXP_CONST))
 
 def add_mantissas(a: List[int], b: List[int]) -> List[int]:
     """Складывает два бинарных массива одинаковой длины. Может вернуть массив на 1 бит длиннее (перенос)."""
@@ -108,12 +110,12 @@ def add_ieee(x1: List[int], x2: List[int]) -> List[int]:
     sign1 = x1[0]
     sign2 = x2[0]
 
-    exp1 = unsigned_to_decimal(x1[1:9])
-    exp2 = unsigned_to_decimal(x2[1:9])
+    exp1 = unsigned_to_decimal(x1[1:END_OF_EXP])
+    exp2 = unsigned_to_decimal(x2[1:END_OF_EXP])
     final_exp = max(exp1, exp2)
 
-    man1 = [1] + x1[9:32]
-    man2 = [1] + x2[9:32]
+    man1 = [1] + x1[END_OF_EXP:NUMB_OF_BITS]
+    man2 = [1] + x2[END_OF_EXP:NUMB_OF_BITS]
 
     if exp1 < exp2:
         diff = exp2 - exp1
@@ -141,16 +143,16 @@ def add_ieee(x1: List[int], x2: List[int]) -> List[int]:
             sum_man = subtract_mantissas(man2, man1)
 
         if sum_man == [0] * len(sum_man):
-            return [0] * 32
+            return [0] * NUMB_OF_BITS
 
         while sum_man[0] == 0:
             sum_man.pop(0)
             sum_man.append(0)
             final_exp -= 1
 
-    final_man = sum_man[1:24]
+    final_man = sum_man[1:LEN_OF_MANTISS+1]
 
-    while len(final_man) < 23:
+    while len(final_man) < LEN_OF_MANTISS:
         final_man.append(0)
 
     final_exp_bits = decimal_to_binary_8bit(final_exp)
@@ -177,42 +179,42 @@ def multiply_mantissas(a: List[int], b: List[int]) -> List[int]:
 def multiply_ieee(x1: List[int], x2: List[int]) -> List[int]:
     sign = x1[0] ^ x2[0]
 
-    if all(b == 0 for b in x1[1:32]) or all(b == 0 for b in x2[1:32]):
-        return [sign] + [0]*31
+    if all(b == 0 for b in x1[1:NUMB_OF_BITS]) or all(b == 0 for b in x2[1:NUMB_OF_BITS]):
+        return [sign] + [0]*(NUMB_OF_BITS-1)
 
-    exp1 = unsigned_to_decimal(x1[1:9])
-    exp2 = unsigned_to_decimal(x2[1:9])
-    final_exp = exp1 + exp2 - 127
+    exp1 = unsigned_to_decimal(x1[1:END_OF_EXP])
+    exp2 = unsigned_to_decimal(x2[1:END_OF_EXP])
+    final_exp = exp1 + exp2 - EXP_CONST
 
-    man1 = [1] + x1[9:32]
-    man2 = [1] + x2[9:32]
+    man1 = [1] + x1[END_OF_EXP:NUMB_OF_BITS]
+    man2 = [1] + x2[END_OF_EXP:NUMB_OF_BITS]
 
     prod = multiply_mantissas(man1, man2)
 
     if prod[0] == 1:
         final_exp += 1
-        final_man = prod[1:24]
+        final_man = prod[1:LEN_OF_MANTISS+1]
     else:
-        final_man = prod[2:25]
+        final_man = prod[2:LEN_OF_MANTISS+2]
 
     final_exp_bits = decimal_to_binary_8bit(final_exp)
     return [sign] + final_exp_bits + final_man
 
 def divide_ieee(x1: List[int], x2: List[int]) -> List[int]:
-    if all(b == 0 for b in x2[1:32]):
+    if all(b == 0 for b in x2[1:NUMB_OF_BITS]):
         raise ZeroDivisionError("Cannot divide by zero in IEEE-754")
 
-    if all(b == 0 for b in x1[1:32]):
-        return [x1[0] ^ x2[0]] + [0] * 31
+    if all(b == 0 for b in x1[1:NUMB_OF_BITS]):
+        return [x1[0] ^ x2[0]] + [0] * (NUMB_OF_BITS-1)
 
     sign = x1[0] ^ x2[0]
 
-    exp1 = unsigned_to_decimal(x1[1:9])
-    exp2 = unsigned_to_decimal(x2[1:9])
-    final_exp = exp1 - exp2 + 127
+    exp1 = unsigned_to_decimal(x1[1:END_OF_EXP])
+    exp2 = unsigned_to_decimal(x2[1:END_OF_EXP])
+    final_exp = exp1 - exp2 + EXP_CONST
 
-    man1 = [1] + x1[9:32]
-    man2 = [1] + x2[9:32]
+    man1 = [1] + x1[END_OF_EXP:NUMB_OF_BITS]
+    man2 = [1] + x2[END_OF_EXP:NUMB_OF_BITS]
     man2_clean = clean_zeros(man2)
 
     int_part = []
@@ -244,14 +246,14 @@ def divide_ieee(x1: List[int], x2: List[int]) -> List[int]:
     try:
         first_one_idx = full_res.index(1)
     except ValueError:
-        return [0] * 32
+        return [0] * NUMB_OF_BITS
 
     final_exp -= first_one_idx
 
     start_idx = first_one_idx + 1
-    final_man = full_res[start_idx: start_idx + 23]
+    final_man = full_res[start_idx: start_idx + LEN_OF_MANTISS]
 
-    while len(final_man) < 23:
+    while len(final_man) < LEN_OF_MANTISS:
         final_man.append(0)
 
     final_exp_bits = decimal_to_binary_8bit(final_exp)
