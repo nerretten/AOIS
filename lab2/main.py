@@ -48,7 +48,7 @@ def main():
     fictitious = find_fictitious_vars(truth_table, variables)
     print(f"\nФиктивные переменные: {fictitious if fictitious else 'Нет'}")
 
-    #9. Булева дифференциация
+    # 9. Булева дифференциация
     print("\n Булева дифференциация ")
     max_order = min(len(variables) + 1, 5)
     for order in range(1, max_order):
@@ -59,11 +59,17 @@ def main():
 
     # 10. Расчетный метод
     print("\n Расчетный метод (склеивание) ")
-    prime_implicants = calculate_method(truth_table, variables)
+    print("--- Для МДНФ ---")
+    prime_implicants_dnf = calculate_method(truth_table, variables, is_dnf=True)
+    print("\n--- Для МКНФ ---")
+    prime_implicants_knf = calculate_method(truth_table, variables, is_dnf=False)
 
     # 11. Расчетно-табличный метод
     print("\n Расчетно-табличный метод")
-    tabular_calc_method(truth_table, prime_implicants, variables)
+    print("--- Для МДНФ ---")
+    tabular_calc_method(truth_table, prime_implicants_dnf, variables, is_dnf=True)
+    print("\n--- Для МКНФ ---")
+    tabular_calc_method(truth_table, prime_implicants_knf, variables, is_dnf=False)
 
     # 12. Карты Карно
     print("\nТабличный метод (Карта Карно) ")

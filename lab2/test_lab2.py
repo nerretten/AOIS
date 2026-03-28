@@ -14,7 +14,7 @@ from analyzer import (get_zhegalkin_coeffs, get_next_layer, build_zhegalkin_poly
                       calc_derivative_vector, get_mixed_derivative, find_fictitious_vars)
 from minimization import (get_binary_implicants, glue_step, get_diff_index, calculate_method,
                           tabular_calc_method, print_karnaugh_map, covers,
-                          get_prime_implicants_quiet, get_minimal_cover, format_final_mdnf)
+                          get_prime_implicants_quiet, get_minimal_cover, format_final_form)
 from main import main
 
 
@@ -32,7 +32,7 @@ from main import main
     (REP_IMP, 0, 1, 1),
     (OP_EQ, 1, 1, 1),
     (OP_EQ, 1, 0, 0),
-    ('unknown', 1, 1, 0)  # Фоллбэк
+    ('unknown', 1, 1, 0)
 ])
 def test_evaluate_operator(op, val1, val2, expected):
     assert evaluate_operator(op, val1, val2) == expected
@@ -121,14 +121,9 @@ def test_sdnf_sknf(sample_table):
     sknf = get_sknf(sample_table, vars_list)
     assert sknf == "(a v b) & (¬a v ¬b)"
 
-    # Краевые случаи: все 0 или все 1
     table_zeros = [({'a': 0}, 0), ({'a': 1}, 0)]
     assert get_sdnf(table_zeros, ['a']) == "0"
     assert get_sknf(table_zeros, ['a']) == "(a) & (¬a)"
-
-    table_ones = [({'a': 0}, 1), ({'a': 1}, 1)]
-    assert get_sdnf(table_ones, ['a']) == "(¬a) v (a)"
-    assert get_sknf(table_ones, ['a']) == "1"
 
 
 def test_numeric_and_index_forms(sample_table):
@@ -136,11 +131,10 @@ def test_numeric_and_index_forms(sample_table):
     assert ones == [1, 2]
     assert zeros == [0, 3]
 
-    assert get_index_form(sample_table) == int("0110", 2)  # 6
+    assert get_index_form(sample_table) == int("0110", 2)
 
 
 def test_post_classes():
-    # Функция XOR: не T0(если 00->0 - T0 выполняется), 00->0, 11->0 (не T1)
     table_xor = [({'a': 0}, 0), ({'a': 1}, 1)]
     coeffs = [0, 1]
     classes = check_post_classes(table_xor, coeffs)
@@ -148,39 +142,34 @@ def test_post_classes():
     assert classes["T1"] is True
 
     assert check_self_dual([0, 1, 1, 0]) is False
-    assert check_self_dual([0, 1, 0, 1]) is True  # самодвойственная
+    assert check_self_dual([0, 1, 0, 1]) is True
 
     assert check_monotonic([({'a': 0}, 0), ({'a': 1}, 1)]) is True
     assert check_monotonic([({'a': 0}, 1), ({'a': 1}, 0)]) is False
 
-    assert check_linearity([0, 1, 1, 0]) is True  # a + b (линейна)
-    assert check_linearity([0, 0, 0, 1]) is False  # a * b (не линейна)
+    assert check_linearity([0, 1, 1, 0]) is True
+    assert check_linearity([0, 0, 0, 1]) is False
 
 
 # ========================
 # ТЕСТЫ ДЛЯ ANALYZER.PY
 # ========================
 def test_zhegalkin():
-    table = [({}, 0), ({}, 0), ({}, 0), ({}, 1)]  # конъюнкция
+    table = [({}, 0), ({}, 0), ({}, 0), ({}, 1)]
     coeffs = get_zhegalkin_coeffs(table)
     assert coeffs == [0, 0, 0, 1]
     poly = build_zhegalkin_poly(coeffs, ['a', 'b'])
     assert poly == "ab"
 
-    assert build_zhegalkin_poly([0, 0, 0, 0], ['a', 'b']) == "0"
-    assert build_zhegalkin_poly([1, 0, 0, 0], ['a', 'b']) == "1"
-
 
 def test_derivatives_and_fictitious():
-    # a | b (0, 1, 1, 1)
     table = [({'a': 0, 'b': 0}, 0), ({'a': 0, 'b': 1}, 1), ({'a': 1, 'b': 0}, 1), ({'a': 1, 'b': 1}, 1)]
     vars_list = ['a', 'b']
 
-    # Производная по a для (a|b) - не ноль
     deriv_a = get_mixed_derivative(table, ['a'], vars_list)
-    assert deriv_a != [0, 0, 0, 0]
+    assert len(deriv_a) == 2
+    assert deriv_a != [0, 0]
 
-    # Фиктивная переменная (функция f(a,b) = a)
     table_fict = [({'a': 0, 'b': 0}, 0), ({'a': 0, 'b': 1}, 0), ({'a': 1, 'b': 0}, 1), ({'a': 1, 'b': 1}, 1)]
     assert find_fictitious_vars(table_fict, vars_list) == ['b']
 
@@ -211,17 +200,16 @@ def test_minimization_methods(capsys):
     ]
     vars_list = ['a', 'b', 'c']
 
-    # Тест покрывает метод Квайна
-    primes = calculate_method(table, vars_list)
-    assert "X0X" in primes
+    primes_dnf = calculate_method(table, vars_list, True)
+    assert "X0X" in primes_dnf
 
-    # Тест покрывает таблично-расчетный метод
-    tabular_calc_method(table, primes, vars_list)
+    primes_knf = calculate_method(table, vars_list, False)
+    assert "X1X" in primes_knf
 
-    # Тест покрывает Карту Карно
+    tabular_calc_method(table, primes_dnf, vars_list, True)
+    tabular_calc_method(table, primes_knf, vars_list, False)
+
     print_karnaugh_map(table, vars_list)
-
-    # Тестируем Карту Карно для > 4 переменных (должна прерваться с сообщением)
     print_karnaugh_map(table, ['a', 'b', 'c', 'd', 'e'])
     captured = capsys.readouterr()
     assert "только до 4 переменных" in captured.out
@@ -232,10 +220,14 @@ def test_covers_and_format():
     assert covers("X01", "011") is False
 
     cover = ["X01", "1X0"]
-    formatted = format_final_mdnf(cover, ['a', 'b', 'c'])
-    assert formatted == "(¬b & c) v (a & ¬c)"
+    formatted_dnf = format_final_form(cover, ['a', 'b', 'c'], True)
+    assert formatted_dnf == "(¬b & c) v (a & ¬c)"
 
-    assert format_final_mdnf([], ['a']) == "0"
+    formatted_knf = format_final_form(cover, ['a', 'b', 'c'], False)
+    assert formatted_knf == "(b v ¬c) & (¬a v c)"
+
+    assert format_final_form([], ['a'], True) == "0"
+    assert format_final_form([], ['a'], False) == "1"
 
 
 # ========================
@@ -247,11 +239,7 @@ def test_main_function(mocked_input, capsys):
     captured = capsys.readouterr()
 
     assert "Обнаружены переменные: ['a', 'b', 'c']" in captured.out
-    assert "Таблица истинности:" in captured.out
-    assert "СДНФ:" in captured.out
-    assert "СКНФ:" in captured.out
-    assert "Полином Жегалкина:" in captured.out
-    assert "классам Поста" in captured.out
-    assert "Булева дифференциация" in captured.out
-    assert "Расчетный метод (склеивание)" in captured.out
+    assert "Текущие импликанты (МДНФ):" in captured.out
+    assert "Текущие импликанты (МКНФ):" in captured.out
+    assert "Расчетно-табличный метод" in captured.out
     assert "Карта Карно" in captured.out

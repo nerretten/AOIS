@@ -4,12 +4,6 @@ from config import *
 def get_zhegalkin_coeffs(table: list) -> list:
     """
     Вычисляет коэффициенты полинома Жегалкина методом треугольника (треугольник Паскаля).
-
-    Args:
-        table (list): Таблица истинности.
-
-    Returns:
-        list: Список коэффициентов полинома Жегалкина.
     """
     current_layer = [res for _, res in table]
     coeffs = [current_layer[0]]
@@ -23,12 +17,6 @@ def get_zhegalkin_coeffs(table: list) -> list:
 def get_next_layer(layer: list) -> list:
     """
     Формирует следующий слой для вычисления коэффициентов Жегалкина путем XOR соседних элементов.
-
-    Args:
-        layer (list): Текущий слой значений.
-
-    Returns:
-        list: Следующий слой значений.
     """
     next_layer = []
     for i in range(len(layer) - 1):
@@ -39,13 +27,6 @@ def get_next_layer(layer: list) -> list:
 def build_zhegalkin_poly(coeffs: list, variables: list) -> str:
     """
     Собирает строковое представление полинома Жегалкина.
-
-    Args:
-        coeffs (list): Коэффициенты полинома.
-        variables (list): Список переменных.
-
-    Returns:
-        str: Строка с полиномом Жегалкина.
     """
     terms = []
     num_vars = len(variables)
@@ -58,24 +39,29 @@ def build_zhegalkin_poly(coeffs: list, variables: list) -> str:
 
 
 def calc_derivative_vector(vector: list, var_idx: int, num_vars: int) -> list:
-    """Считает производную по одной переменной для вектора значений """
+    """Считает производную по одной переменной для вектора значений."""
     deriv = []
-    for i in range(len(vector)):
-        # Создаем маску, где 1 стоит на месте нашей переменной, и делаем XOR индекса
-        mask = 1 << (num_vars - 1 - var_idx)
-        pair_idx = i ^ mask
-        deriv.append(vector[i] ^ vector[pair_idx])
+    bit_pos = num_vars - 1 - var_idx
+    lower_mask = (1 << bit_pos) - 1
+    for i in range(len(vector) // 2):
+        idx0 = ((i >> bit_pos) << (bit_pos + 1)) | (i & lower_mask)
+        idx1 = idx0 | (1 << bit_pos)
+        deriv.append(vector[idx0] ^ vector[idx1])
     return deriv
 
 
 def get_mixed_derivative(table: list, target_vars: list, variables: list) -> list:
-    """Вычисляет частную (1 переменная) или смешанную (>1) производную."""
-    num_vars = len(variables)
+    """Вычисляет частную (1 переменная) или смешанную (>1) производную. Размерность уменьшается."""
     current_vector = [res for _, res in table]
+    current_vars = variables[:]
 
     for var in target_vars:
-        var_idx = variables.index(var)
+        if var not in current_vars:
+            continue
+        var_idx = current_vars.index(var)
+        num_vars = len(current_vars)
         current_vector = calc_derivative_vector(current_vector, var_idx, num_vars)
+        current_vars.pop(var_idx)
     return current_vector
 
 
